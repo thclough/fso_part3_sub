@@ -1,7 +1,26 @@
 const express = require('express')
 const app = express()
+var morgan = require('morgan')
 
 app.use(express.json())
+
+const mg = morgan(function (tokens, req, res) {
+    
+    const content = req.method == 'POST' 
+        ? JSON.stringify(req.body)
+        : null
+
+    return [
+      tokens.method(req, res),
+      tokens.url(req, res),
+      tokens.status(req, res),
+      tokens.res(req, res, 'content-length'), '-',
+      tokens['response-time'](req, res), 'ms',
+      content
+    ].join(' ')
+  })
+
+app.use(mg)
 
 let entries = [
     { 
@@ -50,6 +69,7 @@ app.get('/api/persons/:id', (request, response) => {
 
 app.delete('/api/persons/:id', (request, response) => {
     const id = request.params.id
+
     entries = entries.filter(entry => entry.id !== id)
 
     response.status(204).end()
@@ -63,7 +83,7 @@ function getRandomIntInclusive(min, max) {
   }
 
 const generateId = () => {
-    return getRandomIntInclusive(0,100000)
+    return String(getRandomIntInclusive(0,100000))
 }
 
 app.post('/api/persons', (request, response) => {
@@ -78,7 +98,6 @@ app.post('/api/persons', (request, response) => {
 
     const match = entries.find(entry => entry.name == body.name)
 
-    console.log(body.name)
     if (match) {
         return response.status(400).json({
             error: `${body.name} already in phonebook`
@@ -97,8 +116,6 @@ app.post('/api/persons', (request, response) => {
         number: body.number,
         id: generateId()
     }
-
-    console.log(entry)
 
     entries = entries.concat(entry)
 
