@@ -1,12 +1,13 @@
+require('dotenv').config()
 const express = require('express')
 const app = express()
 var morgan = require('morgan')
 const cors = require('cors')
+const Entry = require('./models/entry')
 
 app.use(express.static('dist'))
 app.use(cors())
 app.use(express.json())
-
 
 const mg = morgan(function (tokens, req, res) {
     
@@ -51,7 +52,9 @@ let entries = [
 
 
 app.get('/api/persons', (request, response) => {
-    response.json(entries)
+    Entry.find({}).then(entries =>
+        response.json(entries)
+    )
   })
 
 app.get('/info', (request, response) => {
@@ -61,14 +64,9 @@ app.get('/info', (request, response) => {
 })
 
 app.get('/api/persons/:id', (request, response) => {
-    const id = request.params.id
-    const entry = entries.find(entry => entry.id === id)
-
-    if (entry) {
+    Entry.findById(request.params.id).then(entry => {
         response.json(entry)
-    } else {
-        response.status(404).end()
-    }
+    })
 })
 
 app.delete('/api/persons/:id', (request, response) => {
@@ -94,36 +92,36 @@ app.post('/api/persons', (request, response) => {
     const body = request.body
 
     // validate the content
-    if (!body.name)  {
+    if (body.name === undefined)  {
         return response.status(400).json({
             error: 'name missing'
         })
     }
 
-    const match = entries.find(entry => entry.name == body.name)
+    // something to check if already in phonebook
+    // const match = entries.find(entry => entry.name == body.name)
 
-    if (match) {
-        return response.status(400).json({
-            error: `${body.name} already in phonebook`
-        })
-    }
+    // if (match) {
+    //     return response.status(400).json({
+    //         error: `${body.name} already in phonebook`
+    //     })
+    // }
 
-    if (!body.number) {
+    if (body.number === undefined) {
         return response.status(400).json({
             error: 'number missing'
         })
     }
 
     // create the note
-    const entry = {
+    const entry = new Entry({
         name: body.name,
-        number: body.number,
-        id: generateId()
-    }
+        number: body.number
+    })
 
-    entries = entries.concat(entry)
-
-    response.json(entry)
+    entry.save().then(savedEntry => {
+        response.json(savedEntry)
+    })
 })
 
 
