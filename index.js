@@ -45,7 +45,7 @@ app.get('/api/persons/:id', (request, response, next) => {
         .then(entry => {
         if (entry) {
             response.json(entry)
-        } else {
+        } else { //not found
             response.status(404).end()
         }
         })
@@ -60,31 +60,9 @@ app.delete('/api/persons/:id', (request, response, next) => {
         .catch(error => next(error))
 })
 
-app.post('/api/persons', (request, response) => {
+app.post('/api/persons', (request, response, next) => {
     const body = request.body
-
-    // validate the content
-    if (body.name === undefined)  {
-        return response.status(400).json({
-            error: 'name missing'
-        })
-    }
-
-    // something to check if already in phonebook
-    // const match = entries.find(entry => entry.name == body.name)
-
-    // if (match) {
-    //     return response.status(400).json({
-    //         error: `${body.name} already in phonebook`
-    //     })
-    // } enforce uniqueness in the database of names?
-
-    if (body.number === undefined) {
-        return response.status(400).json({
-            error: 'number missing'
-        })
-    }
-
+    
     // create the note
     const entry = new Entry({
         name: body.name,
@@ -94,36 +72,25 @@ app.post('/api/persons', (request, response) => {
     entry.save().then(savedEntry => {
         response.json(savedEntry)
     })
+    .catch(error => next(error))
 })
 
 app.put('/api/persons/:id', (request, response, next) => {
-    const body = request.body
+    const { name, number } = request.body
 
-    if (!body.name) {
-        return response.status(400).json({
-            error: 'name missing'
-        })
-    }
-
-    if (body.number === null) {
-        return response.status(400).json({
-            error: 'number missing'
-        })
-    }
-
-    const entry = {
-        name: body.name,
-        number: body.number
-    }
-
-    Entry.findByIdAndUpdate(request.params.id, entry, { new: true })
+    Entry.findByIdAndUpdate(
+        request.params.id, 
+        { name, number}, 
+        { new: true, runValidators: true, context: 'query'})
         .then(updatedEntry => {
             if (updatedEntry) {
                 response.json(updatedEntry)
-            } else {
-                response.status(404).end()
+            } else { // entry not found
+                const error = new Error('Id not found')
+                error.name = 'IdNotFound'
+                throw error
             }
-        })
+            })
         .catch(error => next(error))
 })
 
@@ -133,11 +100,16 @@ const errorHandler = (error, request, response, next) => {
 
     if (error.name === 'CastError') {
         return response.status(400).send({ error: 'malformatted id'})
+    } else if (error.name === 'ValidationError') {
+        return response.status(400).json({ error: error.message })
+    } else if (error.name === 'IdNotFound') {
+        return response.status(404).json({ error: error.message})
     }
+
+    next(error)
 }
 
 app.use(errorHandler)
-
 
 const PORT = process.env.PORT || 3001
 app.listen(PORT, () => {

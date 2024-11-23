@@ -1,3 +1,4 @@
+
 const mongoose = require('mongoose')
 mongoose.set('strictQuery', false)
 
@@ -12,9 +13,22 @@ mongoose.connect(url)
         console.log('error connecting to MongoDB:', error.message)
     })
 
+const numberValidator = number => /^\d{2,3}-\d+$/.test(number)
+
 const entrySchema = new mongoose.Schema({
-    name: String,
-    number: String,
+    name: {
+        type: String,
+        minLength: 3,
+        required: true
+    },
+    number: {
+        type: String,
+        validate: {
+            validator: numberValidator,
+            message: props => `${props.value} is not a valid phone number. Must start with 2 or 3 digits, then have one hyphen followed by an arbitrary amount of digits.`
+        },
+        required: true
+    }
 })
 
 entrySchema.set('toJSON', {
