@@ -27,29 +27,6 @@ const mg = morgan(function (tokens, req, res) {
 
 app.use(mg)
 
-let entries = [
-    { 
-      "id": "1",
-      "name": "Arto Hellas", 
-      "number": "040-123456"
-    },
-    { 
-      "id": "2",
-      "name": "Ada Lovelace", 
-      "number": "39-44-5323523"
-    },
-    { 
-      "id": "3",
-      "name": "Dan Abramov", 
-      "number": "12-43-234345"
-    },
-    { 
-      "id": "4",
-      "name": "Mary Poppendieck", 
-      "number": "39-23-6423122"
-    }
-]
-
 
 app.get('/api/persons', (request, response) => {
     Entry.find({}).then(entries =>
@@ -63,30 +40,25 @@ app.get('/info', (request, response) => {
     response.send(`<p>Phonebook has info for ${entries.length} people</p><p>${currentDate}</p>`)
 })
 
-app.get('/api/persons/:id', (request, response) => {
-    Entry.findById(request.params.id).then(entry => {
-        response.json(entry)
+app.get('/api/persons/:id', (request, response, next) => {
+    Entry.findById(request.params.id)
+        .then(entry => {
+        if (entry) {
+            response.json(entry)
+        } else {
+            response.status(404).end()
+        }
+        })
+        .catch(error => next(error))
     })
+
+app.delete('/api/persons/:id', (request, response, next) => {
+    Entry.findByIdAndDelete(request.params.id)
+        .then(result => {
+            response.status(204).end()
+        })
+        .catch(error => next(error))
 })
-
-app.delete('/api/persons/:id', (request, response) => {
-    const id = request.params.id
-
-    entries = entries.filter(entry => entry.id !== id)
-
-    response.status(204).end()
-})
-
-
-function getRandomIntInclusive(min, max) {
-    const minCeiled = Math.ceil(min);
-    const maxFloored = Math.floor(max);
-    return Math.floor(Math.random() * (maxFloored - minCeiled + 1) + minCeiled); // The maximum is inclusive and the minimum is inclusive
-  }
-
-const generateId = () => {
-    return String(getRandomIntInclusive(0,100000))
-}
 
 app.post('/api/persons', (request, response) => {
     const body = request.body
@@ -105,7 +77,7 @@ app.post('/api/persons', (request, response) => {
     //     return response.status(400).json({
     //         error: `${body.name} already in phonebook`
     //     })
-    // }
+    // } enforce uniqueness in the database of names?
 
     if (body.number === undefined) {
         return response.status(400).json({
@@ -123,6 +95,48 @@ app.post('/api/persons', (request, response) => {
         response.json(savedEntry)
     })
 })
+
+app.put('/api/persons/:id', (request, response, next) => {
+    const body = request.body
+
+    if (!body.name) {
+        return response.status(400).json({
+            error: 'name missing'
+        })
+    }
+
+    if (body.number === null) {
+        return response.status(400).json({
+            error: 'number missing'
+        })
+    }
+
+    const entry = {
+        name: body.name,
+        number: body.number
+    }
+
+    Entry.findByIdAndUpdate(request.params.id, entry, { new: true })
+        .then(updatedEntry => {
+            if (updatedEntry) {
+                response.json(updatedEntry)
+            } else {
+                response.status(404).end()
+            }
+        })
+        .catch(error => next(error))
+})
+
+
+const errorHandler = (error, request, response, next) => {
+    console.error(error.message)
+
+    if (error.name === 'CastError') {
+        return response.status(400).send({ error: 'malformatted id'})
+    }
+}
+
+app.use(errorHandler)
 
 
 const PORT = process.env.PORT || 3001
